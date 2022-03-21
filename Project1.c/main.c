@@ -3,6 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRTDBG_MAP_ALLOC
+#define BUFFER_SIZE 1501
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -19,7 +20,7 @@
 #include <stdbool.h>
 SOCKET client_s;
 
-///////////need to understand and remake.
+// translates a string of 26 bytes (-uncoded) into hamming form (-coded) by adding 5 parity bits (log(26) = 5)  .
 void Encoder(char* uncoded, char* coded) {
 	char data[248] = { 0 }; //8*31 
 	int i, j, skip = 0;
@@ -75,7 +76,11 @@ int main(int argc, char* argv[])
 	char IP[20], port[40];
 	strcpy(IP, argv[1]);
 	strcpy(port, argv[2]);
+
+	// Infinite iteration for socket opening until recieving quit:
 	while (1) {
+
+		//socket creation and conecction:
 		WSADATA wsa_data; 	// Initialize Winsock
 		SOCKET client_s;
 		int result;
@@ -99,29 +104,69 @@ int main(int argc, char* argv[])
 			printf("Failed to connect to server on %s:%s  %d", argv[1], argv[2], WSAGetLastError());
 		//	return 1;
 		}
-			printf("enter file name:\n");
-			char f_name[100];
-			// Read a char type variable,
-			// store in "f_name"
-			scanf("%s", f_name);
-			if (!strcmp(f_name, "quit"))
-				return cleanupAll(f_name, 0);
-			FILE* f = NULL;
-			f = fopen(f_name, "rb");
-			if (f == NULL)
+
+		printf("enter a file name or quit if done:\n");
+		char f_name[100];
+		// Read a char type variable,
+		// store in "f_name"
+		scanf("%s", f_name);
+		if (!strcmp(f_name, "quit"))
+			return cleanupAll(f_name, 0);
+		FILE* f = NULL;
+		f = fopen(f_name, "rb");
+		if (f == NULL)
+		{
+			printf("File error. Coudn't open file\n");// CHECKING IF OPENED SUCCSESSFULLY
+			return -1;
+		}
+		printf("File opened successfully\n");
+		
+		// read File and send data:
+		char bit_str[27] = { 0 }, bit_str_hamming[32] = { 0 }, buffer[BUFFER_SIZE] = { 0 };
+		int packet_size = 0, bits_read = 0, bits_sent = 0;
+			int i = 0;
+		while (fread(bit_str, 1, 26, f))
+		{
+			bits_read += 26 * 8;
+			Encoder(bit_str, bit_str_hamming);
+			bits_sent += 31 * 8;
+			strncpy(buffer + packet_size, bit_str_hamming, 31);
+			packet_size += 31;
+			//printf("%d\n", strlen(buffer));
+			if (packet_size == BUFFER_SIZE - 1)
 			{
-				printf("File error. Coudn't open file\n");// CHECKING IF OPENED SUCCSESSFULLY
-				return -1;
+				printf("sending packet num %d\n", i);
+				i++;
+				//send data
+				if (send(client_s, buffer, strlen(buffer), 0) == SOCKET_ERROR)
+				{
+					printf("send() failed with error code : %d", WSAGetLastError());
+					exit(EXIT_FAILURE);
+				}
+				for (int i = 0; i < BUFFER_SIZE; i++)
+				{
+					buffer[i] = 0;
+				}
+				packet_size = 0;
 			}
-			printf("File opened successfully\n");
+			//printf("%d %s\n", (char*)coded_chr, buffer);
+		}
+		if (packet_size != BUFFER_SIZE - 1)
+		{
+			buffer[packet_size] = '\0';
+			//sends remaining data after eof
+			if (send(client_s, buffer, strlen(buffer), 0) == SOCKET_ERROR)
+			{
+				printf("sendto() failed with error code : %d", WSAGetLastError());
+				exit(EXIT_FAILURE);
+			}
+			printf("sending packet num %d\n", i);
+		}
 
-			
-			//Do stuff
-			closesocket(client_s);
-			fclose(f);
-		
-		
+		printf("Fils length: %d\nsent %d:\n", bits_read, bits_sent);
 
+		closesocket(client_s);
+		fclose(f);		
 	}
 	return 0;
 }
