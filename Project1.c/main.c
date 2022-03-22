@@ -3,7 +3,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 #define _CRTDBG_MAP_ALLOC
-#define BUFFER_SIZE 1501
+#define BUFFER_SIZE 3101
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
 		if (!strcmp(f_name, "quit"))
 			return cleanupAll(f_name, 0);
 		FILE* f = NULL;
-		f = fopen(f_name, "rb");
+		f = fopen(f_name, "rb"); //Open a binary file for reading. The file must exist.
 		if (f == NULL)
 		{
 			printf("File error. Coudn't open file\n");// CHECKING IF OPENED SUCCSESSFULLY
